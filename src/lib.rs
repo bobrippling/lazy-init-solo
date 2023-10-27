@@ -11,7 +11,7 @@ pub struct Lazy<T> {
 }
 
 impl<T> Lazy<T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             t: UnsafeCell::new(MaybeUninit::uninit()),
             init: Cell::new(false),
@@ -110,6 +110,11 @@ mod tests {
 
     #[test]
     fn recursive_init() {
+        todo!()
+    }
+
+    #[test]
+    fn assert_not_sync() {
         todo!()
     }
 }
