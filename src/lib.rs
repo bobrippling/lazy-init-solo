@@ -4,6 +4,16 @@ use std::{
     mem::MaybeUninit,
 };
 
+/// A `Lazy<T>` is a single-threaded lazy initialised container.
+///
+/// It can be initialised by calling `get_or_create` with a function which will provide the
+/// lazily computed value.
+///
+/// ```compile_fail,E0515
+/// # fn test() {
+/// #     let _: impl Sync = Lazy::<i32>::new();
+/// # }
+/// ```
 pub struct Lazy<T> {
     // SAFETY (racing): we're !Sync so only a single thread can do this at a time
     t: UnsafeCell<MaybeUninit<T>>,
@@ -47,9 +57,12 @@ impl<T> Lazy<T> {
         F: FnOnce() -> T,
     {
         if !self.init.get() {
-            // FIXME: what if f() modifies self?
-            // either we drop this t (and keep the other), replace the other or panic
             let t = f();
+
+            if self.init.get() {
+                // f() modified self
+                panic!("recursive modification of Lazy<T>");
+            }
 
             // SAFETY (initialisation): we're uninitialised from the self.init check
             // SAFETY (mutability): no possibility of other mutable references (&self)
@@ -75,7 +88,7 @@ where
     }
 }
 
-impl<T: Clone + Copy> Clone for Lazy<T> {
+impl<T: Clone> Clone for Lazy<T> {
     fn clone(&self) -> Self {
         match self.get() {
             Some(t) => Self {
@@ -105,16 +118,22 @@ mod tests {
 
     #[test]
     fn double_drop() {
-        todo!()
+        let l = Lazy::new();
+
+        l.get_or_create(|| String::from("hi"));
+        let l2 = l.clone();
+        drop(l);
+        drop(l2);
     }
 
     #[test]
+    #[should_panic]
     fn recursive_init() {
-        todo!()
-    }
+        let l = Lazy::new();
 
-    #[test]
-    fn assert_not_sync() {
-        todo!()
+        l.get_or_create(|| {
+            l.get_or_create(|| 0);
+            0
+        });
     }
 }
